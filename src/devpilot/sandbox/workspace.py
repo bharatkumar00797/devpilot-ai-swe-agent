@@ -16,8 +16,20 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DEFAULT_IGNORES: tuple[str, ...] = (
-    ".git", ".hg", ".svn", "node_modules", ".venv", "venv", "__pycache__",
-    ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build", ".tox", ".env",
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".tox",
+    ".env",
 )
 PROTECTED_PATTERNS: tuple[str, ...] = (".git/*", ".env", ".env.*", "*.pem", "*.key", "id_rsa*")
 
@@ -100,8 +112,10 @@ class Workspace:
     def _iter_files(self, start: Path | None = None) -> list[Path]:
         base = start or self.root
         files = [
-            p for p in base.rglob("*")
-            if p.is_file() and not p.is_symlink()
+            p
+            for p in base.rglob("*")
+            if p.is_file()
+            and not p.is_symlink()
             and not any(part in DEFAULT_IGNORES for part in p.relative_to(self.root).parts)
         ]
         return sorted(files)

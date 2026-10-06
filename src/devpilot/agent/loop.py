@@ -79,8 +79,16 @@ class Agent:
             if action.is_finish:
                 summary = str(action.args.get("summary") or action.thought or "Done.")
                 status = RunStatus.COMPLETED
-                self._record(steps, Step(index=index, thought=action.thought, tool="finish",
-                                         args=action.args, observation=summary))
+                self._record(
+                    steps,
+                    Step(
+                        index=index,
+                        thought=action.thought,
+                        tool="finish",
+                        args=action.args,
+                        observation=summary,
+                    ),
+                )
                 break
 
             started = time.monotonic()
@@ -88,14 +96,30 @@ class Agent:
             if action.tool == "run_tests" and "passed" in result.metadata:
                 tests_passed = bool(result.metadata["passed"])
             observation = truncate_middle(result.output, self.max_observation_chars)
-            self._record(steps, Step(
-                index=index, thought=action.thought, tool=action.tool, args=action.args,
-                ok=result.ok, observation=observation, duration_s=time.monotonic() - started,
-            ))
-            messages.append(Message("user", OBSERVATION_TEMPLATE.format(
-                tool=action.tool, status="ok" if result.ok else "error", output=observation,
-                step=index, max_steps=self.max_steps,
-            )))
+            self._record(
+                steps,
+                Step(
+                    index=index,
+                    thought=action.thought,
+                    tool=action.tool,
+                    args=action.args,
+                    ok=result.ok,
+                    observation=observation,
+                    duration_s=time.monotonic() - started,
+                ),
+            )
+            messages.append(
+                Message(
+                    "user",
+                    OBSERVATION_TEMPLATE.format(
+                        tool=action.tool,
+                        status="ok" if result.ok else "error",
+                        output=observation,
+                        step=index,
+                        max_steps=self.max_steps,
+                    ),
+                )
+            )
 
         return AgentResult(
             status=status,

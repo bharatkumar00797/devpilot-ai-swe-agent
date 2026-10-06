@@ -32,13 +32,56 @@ _BACKTICK_RE = re.compile(r"`([^`\n]+)`")
 _IDENT_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]{2,})\b")
 _SEARCH_HIT_RE = re.compile(r"^([^\s:][^:]*):(\d+):", re.MULTILINE)
 _CODE_EXTENSIONS = (
-    ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".rs", ".java", ".kt", ".rb", ".php",
-    ".c", ".h", ".cc", ".cpp", ".cs", ".swift", ".scala",
+    ".py",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".kt",
+    ".rb",
+    ".php",
+    ".c",
+    ".h",
+    ".cc",
+    ".cpp",
+    ".cs",
+    ".swift",
+    ".scala",
 )
 _STOPWORDS = {
-    "the", "and", "for", "that", "this", "with", "should", "returns", "return", "when",
-    "from", "into", "wrong", "result", "results", "bug", "issue", "fix", "test", "tests",
-    "looks", "like", "function", "file", "instead", "not", "are", "was", "have", "has",
+    "the",
+    "and",
+    "for",
+    "that",
+    "this",
+    "with",
+    "should",
+    "returns",
+    "return",
+    "when",
+    "from",
+    "into",
+    "wrong",
+    "result",
+    "results",
+    "bug",
+    "issue",
+    "fix",
+    "test",
+    "tests",
+    "looks",
+    "like",
+    "function",
+    "file",
+    "instead",
+    "not",
+    "are",
+    "was",
+    "have",
+    "has",
 }
 
 
@@ -64,11 +107,12 @@ def pick_search_query(issue: str) -> str:
     if suggestion:
         return suggestion[0]
     for token in _BACKTICK_RE.findall(issue):
-        if len(token.strip()) >= 3:
-            return token.strip().rstrip("()")
+        cleaned = str(token).strip()
+        if len(cleaned) >= 3:
+            return cleaned.rstrip("()")
     for token in _IDENT_RE.findall(issue):
-        if token.lower() not in _STOPWORDS:
-            return token
+        if str(token).lower() not in _STOPWORDS:
+            return str(token)
     return issue.strip().split("\n", 1)[0][:40]
 
 
@@ -105,8 +149,9 @@ class MockProvider(LLMProvider):
 
         target = self._target_file(history)
         if "read_file" not in called and target:
-            return _act(f"Read {target} to understand the implementation.", "read_file",
-                        {"path": target})
+            return _act(
+                f"Read {target} to understand the implementation.", "read_file", {"path": target}
+            )
 
         if "run_tests" not in called:
             return _act("Run the test suite to reproduce the failure.", "run_tests", {})
@@ -135,7 +180,8 @@ class MockProvider(LLMProvider):
         else:
             summary = (
                 "Investigated the issue and reproduced it with the test suite, but no confident "
-                "patch could be derived offline. Configure a real LLM provider for open-ended fixes."
+                "patch could be derived offline. Configure a real LLM provider for open-ended "
+                "fixes."
             )
         return _act("Wrap up and report the outcome.", "finish", {"summary": summary})
 

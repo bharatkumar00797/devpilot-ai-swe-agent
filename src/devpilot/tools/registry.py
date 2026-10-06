@@ -43,15 +43,14 @@ class Tool:
             if typ is bool and isinstance(value, str):
                 value = value.strip().lower() in {"true", "1", "yes"}
             if not isinstance(value, typ) or (typ is int and isinstance(value, bool)):
-                raise ToolArgumentError(
-                    f"Argument '{name}' for {self.name} must be {typ.__name__}"
-                )
+                raise ToolArgumentError(f"Argument '{name}' for {self.name} must be {typ.__name__}")
             clean[name] = value
         return clean
 
     def signature(self) -> str:
         params = ", ".join(
-            f"{n}: {t.__name__}{'' if req else ' (optional)'}" for n, (t, req, _) in self.args.items()
+            f"{n}: {t.__name__}{'' if req else ' (optional)'}"
+            for n, (t, req, _) in self.args.items()
         )
         lines = [f"- {self.name}({params}): {self.description}"]
         lines += [f"    {n}: {desc}" for n, (_, _, desc) in self.args.items()]

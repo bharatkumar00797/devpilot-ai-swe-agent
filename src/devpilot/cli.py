@@ -23,10 +23,7 @@ def _print_step(step: Step) -> None:
 
 
 def _cmd_run(ns: argparse.Namespace) -> int:
-    if ns.issue_file:
-        issue = Path(ns.issue_file).read_text(encoding="utf-8")
-    else:
-        issue = ns.issue or ""
+    issue = Path(ns.issue_file).read_text(encoding="utf-8") if ns.issue_file else ns.issue or ""
     if not issue.strip():
         print("error: provide --issue or --issue-file", file=sys.stderr)
         return 2
@@ -39,7 +36,10 @@ def _cmd_run(ns: argparse.Namespace) -> int:
 
     print(f"DevPilot {__version__} | provider={settings.provider} | repo={ns.repo}")
     result = run_task(
-        Path(ns.repo), issue, settings=settings, test_command=ns.test_command,
+        Path(ns.repo),
+        issue,
+        settings=settings,
+        test_command=ns.test_command,
         on_step=None if ns.quiet else _print_step,
     )
 

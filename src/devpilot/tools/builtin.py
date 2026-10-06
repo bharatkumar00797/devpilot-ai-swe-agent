@@ -34,9 +34,7 @@ def build_default_registry(
         return ToolResult(True, "\n".join(files) or "(no files)", {"count": len(files)})
 
     def read_file(args: dict[str, Any]) -> ToolResult:
-        text = workspace.read_text(
-            args["path"], args.get("start_line", 1), args.get("end_line")
-        )
+        text = workspace.read_text(args["path"], args.get("start_line", 1), args.get("end_line"))
         return ToolResult(True, text or "(empty file)")
 
     def search_code(args: dict[str, Any]) -> ToolResult:
@@ -66,53 +64,74 @@ def build_default_registry(
         result = runner.run(args["command"])
         return ToolResult(True, result.format(), {"exit_code": result.exit_code})
 
-    registry.register(Tool(
-        "list_files", "List files in the repository (or a sub-directory).",
-        {"path": (str, False, "directory relative to the repo root, default '.'")},
-        list_files,
-    ))
-    registry.register(Tool(
-        "read_file", "Read a file with line numbers.",
-        {
-            "path": (str, True, "file path relative to the repo root"),
-            "start_line": (int, False, "first line to show (1-based)"),
-            "end_line": (int, False, "last line to show (inclusive)"),
-        },
-        read_file,
-    ))
-    registry.register(Tool(
-        "search_code", "Search all text files for a string or regex.",
-        {
-            "query": (str, True, "text to search for"),
-            "regex": (bool, False, "treat query as a regular expression"),
-        },
-        search_code,
-    ))
-    registry.register(Tool(
-        "replace_in_file", "Replace one exact, unique snippet of text in a file.",
-        {
-            "path": (str, True, "file to edit"),
-            "old": (str, True, "exact existing text; must occur exactly once"),
-            "new": (str, True, "replacement text"),
-        },
-        replace_in_file,
-    ))
-    registry.register(Tool(
-        "write_file", "Create or overwrite a file with the given content.",
-        {
-            "path": (str, True, "file to write"),
-            "content": (str, True, "full new file content"),
-        },
-        write_file,
-    ))
-    registry.register(Tool(
-        "run_tests", f"Run the project's test suite (`{test_cmd}`).",
-        {"target": (str, False, "optional test file or node id to narrow the run")},
-        run_tests,
-    ))
-    registry.register(Tool(
-        "run_command", "Run an allowlisted developer command (tests, linters) in the sandbox.",
-        {"command": (str, True, "command line, e.g. 'ruff check .'")},
-        run_command,
-    ))
+    registry.register(
+        Tool(
+            "list_files",
+            "List files in the repository (or a sub-directory).",
+            {"path": (str, False, "directory relative to the repo root, default '.'")},
+            list_files,
+        )
+    )
+    registry.register(
+        Tool(
+            "read_file",
+            "Read a file with line numbers.",
+            {
+                "path": (str, True, "file path relative to the repo root"),
+                "start_line": (int, False, "first line to show (1-based)"),
+                "end_line": (int, False, "last line to show (inclusive)"),
+            },
+            read_file,
+        )
+    )
+    registry.register(
+        Tool(
+            "search_code",
+            "Search all text files for a string or regex.",
+            {
+                "query": (str, True, "text to search for"),
+                "regex": (bool, False, "treat query as a regular expression"),
+            },
+            search_code,
+        )
+    )
+    registry.register(
+        Tool(
+            "replace_in_file",
+            "Replace one exact, unique snippet of text in a file.",
+            {
+                "path": (str, True, "file to edit"),
+                "old": (str, True, "exact existing text; must occur exactly once"),
+                "new": (str, True, "replacement text"),
+            },
+            replace_in_file,
+        )
+    )
+    registry.register(
+        Tool(
+            "write_file",
+            "Create or overwrite a file with the given content.",
+            {
+                "path": (str, True, "file to write"),
+                "content": (str, True, "full new file content"),
+            },
+            write_file,
+        )
+    )
+    registry.register(
+        Tool(
+            "run_tests",
+            f"Run the project's test suite (`{test_cmd}`).",
+            {"target": (str, False, "optional test file or node id to narrow the run")},
+            run_tests,
+        )
+    )
+    registry.register(
+        Tool(
+            "run_command",
+            "Run an allowlisted developer command (tests, linters) in the sandbox.",
+            {"command": (str, True, "command line, e.g. 'ruff check .'")},
+            run_command,
+        )
+    )
     return registry

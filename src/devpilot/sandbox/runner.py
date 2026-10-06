@@ -160,7 +160,7 @@ class CommandRunner:
             stderr=subprocess.PIPE,
             text=True,
             start_new_session=posix,
-            preexec_fn=self._limits if posix else None,  # noqa: PLW1509
+            preexec_fn=self._limits if posix else None,
         )
         timed_out = False
         try:
