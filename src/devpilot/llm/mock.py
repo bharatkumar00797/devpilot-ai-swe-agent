@@ -31,6 +31,10 @@ _SUGGESTION_RES = [
 _BACKTICK_RE = re.compile(r"`([^`\n]+)`")
 _IDENT_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]{2,})\b")
 _SEARCH_HIT_RE = re.compile(r"^([^\s:][^:]*):(\d+):", re.MULTILINE)
+_CODE_EXTENSIONS = (
+    ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".rs", ".java", ".kt", ".rb", ".php",
+    ".c", ".h", ".cc", ".cpp", ".cs", ".swift", ".scala",
+)
 _STOPWORDS = {
     "the", "and", "for", "that", "this", "with", "should", "returns", "return", "when",
     "from", "into", "wrong", "result", "results", "bug", "issue", "fix", "test", "tests",
@@ -157,14 +161,16 @@ class MockProvider(LLMProvider):
         for tool, observation in history:
             if tool == "search_code":
                 hits = [m.group(1) for m in _SEARCH_HIT_RE.finditer(observation)]
-                source_hits = [h for h in hits if "test" not in h.lower()]
-                if source_hits or hits:
-                    return (source_hits or hits)[0]
+                code = [h for h in hits if h.endswith(_CODE_EXTENSIONS)]
+                source = [h for h in code if "test" not in h.lower()]
+                for group in (source, code, hits):
+                    if group:
+                        return group[0]
         for tool, observation in history:
             if tool == "list_files":
                 for line in observation.splitlines():
                     name = line.strip()
-                    if name.endswith(".py") and "test" not in name.lower():
+                    if name.endswith(_CODE_EXTENSIONS) and "test" not in name.lower():
                         return name
         return None
 
