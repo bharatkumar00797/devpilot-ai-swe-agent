@@ -4,7 +4,7 @@
 > runs the tests in a sandbox, iterates on failures and hands back a reviewable diff
 > with a PR summary.
 
-**Status:** early development (v0.1). See the roadmap below.
+**Status:** early development (v0.1).
 
 ## Why
 
@@ -26,11 +26,35 @@ your secrets, or the network.
 
 ## Quick start
 
-_Coming soon._
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Runs fully offline with the deterministic mock provider
+devpilot run --repo examples/buggy-calculator \
+  --issue-file examples/issues/buggy-calculator.md --out runs/demo
+
+cat runs/demo/PR_SUMMARY.md   # PR description + diff
+```
+
+To use a real model, copy `.env.example` to `.env` and set `DEVPILOT_PROVIDER=openai`
+plus `DEVPILOT_BASE_URL` / `DEVPILOT_API_KEY` / `DEVPILOT_MODEL` (works with OpenAI, Groq,
+OpenRouter or a local Ollama server).
 
 ## Architecture
 
-_Coming soon._
+```
+src/devpilot/
+  agent/     plan -> act -> observe loop, JSON action parser, prompts, result models
+  llm/       provider interface, offline mock provider, OpenAI-compatible client
+  tools/     tool registry (validated args) + built-in workspace tools
+  sandbox/   isolated workspace copy, path guard, allowlisted command runner
+  report.py  PR-style Markdown summary
+  service.py wires everything together for the CLI / API
+  cli.py     `devpilot run ...`
+```
+
+_Full diagram and walkthrough coming soon._
 
 ## Security model
 
