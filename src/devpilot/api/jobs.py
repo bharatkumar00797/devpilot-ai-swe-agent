@@ -82,6 +82,9 @@ class RunManager:
     its time in subprocesses or HTTP calls). ``max_active`` bounds queued + running
     work so a burst of requests cannot pile up unbounded jobs; old finished runs are
     evicted once ``max_kept`` is exceeded.
+
+    With ``inline=True`` no worker pool is created and :meth:`submit` executes the run
+    in the calling thread, returning only once it has finished (serverless mode).
     """
 
     def __init__(
@@ -91,8 +94,14 @@ class RunManager:
         max_active: int = 8,
         max_kept: int = 200,
         task_fn: TaskFn = default_task,
+        inline: bool = False,
     ) -> None:
-        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="devpilot")
+        self.inline = inline
+        self._executor = (
+            None
+            if inline
+            else ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="devpilot")
+        )
         self._max_active = max_active
         self._max_kept = max_kept
         self._task_fn = task_fn
@@ -123,7 +132,10 @@ class RunManager:
                 raise QueueFull("Too many runs in progress; try again shortly")
             self._runs[record.id] = record
             self._evict_unlocked()
-        self._executor.submit(self._execute, record, settings)
+        if self._executor is None:
+            self._execute(record, settings)
+        else:
+            self._executor.submit(self._execute, record, settings)
         return record
 
     def get(self, run_id: str, owner: str) -> RunRecord | None:
@@ -143,7 +155,8 @@ class RunManager:
             return self.active_count_unlocked()
 
     def shutdown(self) -> None:
-        self._executor.shutdown(wait=False, cancel_futures=True)
+        if self._executor is not None:
+            self._executor.shutdown(wait=False, cancel_futures=True)
 
     # --------------------------------------------------------------- internal
     def active_count_unlocked(self) -> int:

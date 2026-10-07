@@ -23,6 +23,7 @@ from devpilot.api.schemas import (
     DemoOut,
     HealthOut,
     RunCreate,
+    RunCreatedOut,
     RunDetailOut,
     RunListOut,
     RunSummaryOut,
@@ -171,6 +172,7 @@ def create_app(
         max_active=cfg.max_queued_runs,
         max_kept=cfg.max_runs_kept,
         task_fn=task_fn or default_task,
+        inline=cfg.sync_runs,
     )
 
     @asynccontextmanager
@@ -235,6 +237,7 @@ def create_app(
             default_max_steps=min(base_agent.max_steps, cfg.max_steps_cap),
             max_steps_cap=cfg.max_steps_cap,
             max_issue_chars=MAX_ISSUE_CHARS,
+            sync_runs=cfg.sync_runs,
             demos=[
                 DemoOut(name=d.name, repo=f"{DEMO_PREFIX}{d.name}", issue=d.issue)
                 for d in resolver.demos()
@@ -244,11 +247,12 @@ def create_app(
     # --------------------------------------------------------------- runs
     @app.post(
         "/api/runs",
-        response_model=RunSummaryOut,
+        response_model=RunCreatedOut,
         status_code=status.HTTP_202_ACCEPTED,
         tags=["runs"],
+        responses={200: {"model": RunCreatedOut, "description": "Finished run (sync mode)"}},
     )
-    def create_run(body: RunCreate, who: CallerDep) -> RunSummaryOut:
+    def create_run(body: RunCreate, who: CallerDep, response: Response) -> RunCreatedOut:
         if body.max_steps is not None and body.max_steps > cfg.max_steps_cap:
             raise HTTPException(
                 422,
@@ -289,7 +293,11 @@ def create_app(
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE, str(exc), headers={"Retry-After": "10"}
             ) from exc
-        return _summary(record)
+        detail = _detail(record).model_dump()
+        if not record.done:
+            return RunCreatedOut(**detail)
+        response.status_code = status.HTTP_200_OK
+        return RunCreatedOut(**detail, steps=record.steps_since(0))
 
     @app.get("/api/runs", response_model=RunListOut, tags=["runs"])
     def list_runs(who: CallerDep, limit: Annotated[int, Query(ge=1, le=100)] = 20) -> RunListOut:

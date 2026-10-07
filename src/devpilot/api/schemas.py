@@ -67,6 +67,17 @@ class RunDetailOut(RunSummaryOut):
     error: str | None = None
 
 
+class RunCreatedOut(RunDetailOut):
+    """Response of ``POST /api/runs``.
+
+    In background mode the run is still ``queued``; poll the trace endpoint. In sync
+    (serverless) mode the run has already finished and ``steps`` holds the full trace,
+    so clients never depend on a follow-up request reaching the same instance.
+    """
+
+    steps: list[Step] = Field(default_factory=list)
+
+
 class RunListOut(BaseModel):
     runs: list[RunSummaryOut]
 
@@ -95,6 +106,7 @@ class ConfigOut(BaseModel):
     default_max_steps: int
     max_steps_cap: int
     max_issue_chars: int
+    sync_runs: bool = Field(description="runs finish within the POST /api/runs request")
     demos: list[DemoOut]
 
 

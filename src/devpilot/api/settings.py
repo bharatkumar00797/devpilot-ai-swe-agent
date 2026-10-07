@@ -26,6 +26,11 @@ def default_demo_dir() -> Path:
     return Path.cwd() / "examples"
 
 
+def running_serverless() -> bool:
+    """True on serverless platforms where background threads do not outlive a request."""
+    return any(os.getenv(name) for name in ("VERCEL", "AWS_LAMBDA_FUNCTION_NAME"))
+
+
 @dataclass(frozen=True)
 class ApiSettings:
     """Service settings.
@@ -36,6 +41,11 @@ class ApiSettings:
     * ``dev_mode`` enabled -> no auth; meant for ``localhost`` use only.
     * neither              -> public demo mode: anonymous access, bundled demos only,
                               offline mock provider only.
+
+    ``sync_runs`` executes each run inside the ``POST /api/runs`` request instead of a
+    background worker. It is required on serverless hosts (enabled automatically when
+    ``VERCEL`` or ``AWS_LAMBDA_FUNCTION_NAME`` is set) because work started in a thread
+    is frozen or killed once the response has been sent.
     """
 
     api_keys: tuple[str, ...] = ()
@@ -50,6 +60,7 @@ class ApiSettings:
     max_runs_kept: int = 200
     max_steps_cap: int = 30
     trust_proxy: bool = False
+    sync_runs: bool = False
 
     @property
     def auth_enabled(self) -> bool:
@@ -81,4 +92,5 @@ class ApiSettings:
             max_runs_kept=max(10, env_int("DEVPILOT_MAX_RUNS_KEPT", 200)),
             max_steps_cap=max(1, env_int("DEVPILOT_MAX_STEPS_CAP", 30)),
             trust_proxy=env_bool("DEVPILOT_TRUST_PROXY", False),
+            sync_runs=env_bool("DEVPILOT_SYNC_RUNS", running_serverless()),
         )
