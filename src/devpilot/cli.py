@@ -56,6 +56,26 @@ def _cmd_run(ns: argparse.Namespace) -> int:
     return 0 if result.status.value == "completed" else 1
 
 
+def _cmd_serve(ns: argparse.Namespace) -> int:
+    import uvicorn
+
+    from devpilot.api import ApiSettings, create_app
+
+    settings = ApiSettings.from_env()
+    if ns.dev:
+        settings = replace(settings, dev_mode=True)
+    if settings.dev_mode and not settings.auth_enabled and ns.host not in {"127.0.0.1", "::1"}:
+        print("warning: dev mode without API keys is exposed beyond localhost", file=sys.stderr)
+    mode = (
+        "api-key auth"
+        if settings.auth_enabled
+        else ("dev mode (no auth)" if settings.dev_mode else "public demo (mock + demos only)")
+    )
+    print(f"DevPilot {__version__} API on http://{ns.host}:{ns.port} | {mode}")
+    uvicorn.run(create_app(settings), host=ns.host, port=ns.port, log_level="info")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="devpilot", description="Autonomous AI SWE agent")
     parser.add_argument("--version", action="version", version=f"devpilot {__version__}")
@@ -72,6 +92,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--out", default="runs/latest", help="output directory for artifacts")
     run.add_argument("--quiet", action="store_true", help="do not print each step")
     run.set_defaults(func=_cmd_run)
+
+    serve = sub.add_parser("serve", help="start the REST API and web dashboard")
+    serve.add_argument("--host", default="127.0.0.1", help="bind address (default: 127.0.0.1)")
+    serve.add_argument("--port", type=int, default=8000, help="port (default: 8000)")
+    serve.add_argument("--dev", action="store_true", help="dev mode: no API key required")
+    serve.set_defaults(func=_cmd_serve)
     return parser
 
 
