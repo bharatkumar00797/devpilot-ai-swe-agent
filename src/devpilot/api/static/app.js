@@ -282,8 +282,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     await loadConfig();
     refreshHistory();
-    const linked = new URLSearchParams(location.hash.slice(1)).get("run");
+    const params = new URLSearchParams(location.hash.slice(1));
+    const linked = params.get("run");
+    const tab = params.get("tab");
     if (linked && /^[a-f0-9]{32}$/.test(linked)) selectRun(linked);
+    if (tab && ["trace", "diff", "summary"].includes(tab)) switchTab(tab);
   } catch (err) {
     $("mode").textContent = "offline";
     showError(`Cannot reach the API: ${err.message}`);
