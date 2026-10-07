@@ -36,6 +36,10 @@ packages = ["src/devpilot"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = [
+  # starlette suggests a future httpx successor for TestClient; httpx is what we ship with
+  "ignore:Using `httpx` with `starlette.testclient`",
+]
 
 [tool.ruff]
 line-length = 100
