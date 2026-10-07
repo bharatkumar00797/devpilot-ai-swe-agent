@@ -12,6 +12,7 @@ Guardrails:
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import shlex
 import shutil
@@ -87,6 +88,21 @@ def network_isolation_available() -> bool:
     return probe.returncode == 0
 
 
+@lru_cache(maxsize=1)
+def tooling_path() -> str | None:
+    """Directory that holds the server's pytest install, for child interpreters.
+
+    Serverless bundles (e.g. Vercel) vendor dependencies into a folder that is only
+    added to ``sys.path`` by the platform's bootstrap, so a child ``python -m pytest``
+    would not find it. Exposing just that directory via ``PYTHONPATH`` fixes this
+    without leaking any of the parent's environment variables.
+    """
+    spec = importlib.util.find_spec("pytest")
+    if spec is None or spec.origin is None:
+        return None
+    return str(Path(spec.origin).resolve().parents[1])
+
+
 class CommandRunner:
     def __init__(
         self,
@@ -137,6 +153,9 @@ class CommandRunner:
             NO_COLOR="1",
             CI="1",
         )
+        site_dir = tooling_path()
+        if site_dir:
+            env["PYTHONPATH"] = site_dir
         return env
 
     def _limits(self) -> None:  # pragma: no cover - runs in the child process
