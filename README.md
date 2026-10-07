@@ -23,6 +23,7 @@ your secrets, or the network.
   timeouts, scrubbed environment, optional network isolation
 - Unified diff + Markdown PR summary as output
 - CLI, REST API (FastAPI) with background runs, and a live web dashboard
+- Docker / compose, Render, Fly.io, Railway and Vercel (serverless sync mode) deployments
 
 ## Quick start
 
@@ -36,6 +37,13 @@ devpilot run --repo examples/buggy-calculator \
 
 cat runs/demo/PR_SUMMARY.md   # PR description + diff
 ```
+
+Bundled demos (each goes from failing to passing tests with the offline provider):
+
+| Demo | What it shows |
+| --- | --- |
+| `examples/buggy-calculator` | single-file bug, one edit, tests red → green |
+| `examples/shopping-cart` | two bugs in two modules; the agent fixes one, re-runs the still-failing tests, then fixes the second (iterate on failure) |
 
 To use a real model, copy `.env.example` to `.env` and set `DEVPILOT_PROVIDER=openai`
 plus `DEVPILOT_BASE_URL` / `DEVPILOT_API_KEY` / `DEVPILOT_MODEL` (works with OpenAI, Groq,
@@ -53,7 +61,7 @@ live step trace, then review the colored diff and PR summary). Interactive API d
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/runs` | start a run in the background → `202` with the run id |
+| `POST` | `/api/runs` | start a run in the background → `202` with the run id (sync mode: `200` with the finished run and full trace) |
 | `GET` | `/api/runs` | your recent runs |
 | `GET` | `/api/runs/{id}` | status, summary, diff, changed files, `tests_passed`, PR summary |
 | `GET` | `/api/runs/{id}/trace?since=N` | step trace; poll with the returned `next_cursor` |
@@ -71,6 +79,35 @@ curl -s -X POST localhost:8000/api/runs -H "X-API-Key: change-me" \
 demo: bundled repos and the offline mock provider only. Keys are compared in constant time,
 requests are rate limited per key/IP, runs are visible only to the key that created them, and
 provider credentials never appear in any response. See `.env.example` for every setting.
+
+## Deploy
+
+Every target runs the same app; without `DEVPILOT_API_KEYS` it starts as a public demo
+(bundled repos + offline mock provider, no paid keys needed). `GET /healthz` is the health check.
+
+```bash
+# Docker (multi-stage, non-root, healthcheck; $PORT is honoured)
+docker build -t devpilot-ai . && docker run -p 8000:8000 devpilot-ai
+
+# docker compose: read-only root fs, tmpfs /tmp, all capabilities dropped, no-new-privileges
+docker compose up --build
+
+# smoke-test any running instance (health + every demo through the API)
+python scripts/smoke_test.py http://127.0.0.1:8000
+```
+
+| Platform | Config | Notes |
+| --- | --- | --- |
+| Render | `render.yaml` | Blueprint, Docker runtime, `healthCheckPath: /healthz` |
+| Fly.io | `fly.toml` | `fly launch --copy-config --no-deploy && fly deploy` |
+| Railway | `railway.json` | Dockerfile builder with health check |
+| Vercel | `vercel.json` + `api/index.py` | serverless; runs execute synchronously (see below) |
+
+**Serverless mode.** Serverless functions freeze background threads once the response is
+sent, so on Vercel (or when `DEVPILOT_SYNC_RUNS=true`) a run executes inside the
+`POST /api/runs` request and the response carries the finished run plus its full trace. Sync
+mode switches on automatically when `VERCEL` or `AWS_LAMBDA_FUNCTION_NAME` is set. Run history
+and rate-limit counters are in memory per instance, so on serverless they are best-effort.
 
 ## Architecture
 
