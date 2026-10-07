@@ -242,3 +242,83 @@ def test_queue_is_bounded_and_crashed_runs_are_reported() -> None:
         detail = _wait(client, first.json()["id"])
         assert detail["status"] == "error"
         assert detail["error"] == "RuntimeError: boom"
+
+
+def test_sync_mode_finishes_the_run_inside_the_post_request() -> None:
+    issue = (DEMO_DIR / "issues" / "shopping-cart.md").read_text(encoding="utf-8")
+    # public-demo + sync: the serverless (Vercel) configuration
+    with _client(api_keys=(), sync_runs=True) as client:
+        cfg = client.get("/api/config").json()
+        assert cfg["sync_runs"] is True
+        assert cfg["access_mode"] == "public-demo"
+        assert {"buggy-calculator", "shopping-cart"} <= {d["name"] for d in cfg["demos"]}
+
+        resp = client.post("/api/runs", json={"repo": "demo:shopping-cart", "issue": issue})
+        assert resp.status_code == 200, resp.text
+        run = resp.json()
+        assert run["status"] == "completed"
+        assert run["tests_passed"] is True
+        assert run["changed_files"] == ["shopcart/models.py", "shopcart/pricing.py"]
+        assert run["steps"][0]["tool"] == "list_files"
+        assert run["steps"][-1]["tool"] == "finish"
+        assert len(run["steps"]) == run["step_count"]
+        assert "Tests: **passing**" in run["pr_summary"]
+        # still retrievable afterwards on the same instance
+        assert client.get(f"/api/runs/{run['id']}").json()["status"] == "completed"
+
+
+def test_async_mode_returns_queued_run_without_steps() -> None:
+    gate = threading.Event()
+
+    def slow_task(repo: Path, issue: str, settings: Settings, on_step: StepCallback) -> AgentResult:
+        gate.wait(5)
+        raise RuntimeError("stop")
+
+    settings = ApiSettings(demo_dir=DEMO_DIR, api_keys=(KEY,))
+    with TestClient(create_app(settings, agent_settings=AGENT, task_fn=slow_task)) as client:
+        resp = client.post(
+            "/api/runs", json={"repo": "demo:buggy-calculator", "issue": "x"}, headers=_auth()
+        )
+        gate.set()
+        assert resp.status_code == 202
+        body = resp.json()
+        assert body["status"] in {"queued", "running"}
+        assert body["steps"] == []
+        assert client.get("/api/config").json()["sync_runs"] is False
+
+
+def test_sync_mode_is_auto_enabled_on_serverless(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("VERCEL", "AWS_LAMBDA_FUNCTION_NAME", "DEVPILOT_SYNC_RUNS"):
+        monkeypatch.delenv(name, raising=False)
+    assert ApiSettings.from_env().sync_runs is False
+    monkeypatch.setenv("VERCEL", "1")
+    assert ApiSettings.from_env().sync_runs is True
+    monkeypatch.setenv("DEVPILOT_SYNC_RUNS", "false")
+    assert ApiSettings.from_env().sync_runs is False
+
+
+def test_serverless_entrypoint_exposes_public_demo_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib.util
+
+    # setenv-then-delenv makes monkeypatch remove whatever the entrypoint sets on teardown
+    for name in (
+        "DEVPILOT_API_KEYS",
+        "DEVPILOT_DEV_MODE",
+        "DEVPILOT_DEMO_DIR",
+        "DEVPILOT_SYNC_RUNS",
+        "DEVPILOT_MAX_STEPS_CAP",
+        "DEVPILOT_COMMAND_TIMEOUT",
+    ):
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("VERCEL", "1")
+    spec = importlib.util.spec_from_file_location("vercel_entry", ROOT / "api" / "index.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with TestClient(module.app) as client:
+        cfg = client.get("/api/config").json()
+        assert cfg["access_mode"] == "public-demo"
+        assert cfg["sync_runs"] is True
+        assert cfg["providers"] == ["mock"]
+        assert len(cfg["demos"]) >= 2
