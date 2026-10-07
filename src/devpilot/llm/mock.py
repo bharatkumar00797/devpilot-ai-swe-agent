@@ -10,15 +10,18 @@ Policy (derived purely from the transcript, so it is stateless and reproducible)
 2. search for the most relevant identifier from the issue
 3. read the best matching file
 4. run the test suite to reproduce the problem
-5. if the issue contains a concrete suggestion such as
-   "`return a - b` should be `return a + b`", apply it as a targeted edit
-6. re-run the tests and finish with a summary
+5. if the issue contains concrete suggestions such as
+   "`return a - b` should be `return a + b`", apply the first one as a targeted edit
+6. re-run the tests; while they still fail and more suggestions remain, locate the
+   next snippet, apply it and test again (iterate on failure)
+7. finish with a summary of every change and the final test outcome
 """
 
 from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 
 from devpilot.llm.base import Completion, LLMProvider, Message, Usage
 
@@ -94,12 +97,21 @@ def _extract_issue(messages: list[Message]) -> str:
     return ""
 
 
-def find_suggestion(issue: str) -> tuple[str, str] | None:
+def find_suggestions(issue: str) -> list[tuple[str, str]]:
+    """Every concrete ``old -> new`` suggestion in the issue, in reading order."""
+    found: list[tuple[int, str, str]] = []
     for pattern in _SUGGESTION_RES:
-        match = pattern.search(issue)
-        if match:
-            return match.group(1), match.group(2)
-    return None
+        found.extend((m.start(), m.group(1), m.group(2)) for m in pattern.finditer(issue))
+    ordered: list[tuple[str, str]] = []
+    for _, old, new in sorted(found):
+        if (old, new) not in ordered:
+            ordered.append((old, new))
+    return ordered
+
+
+def find_suggestion(issue: str) -> tuple[str, str] | None:
+    suggestions = find_suggestions(issue)
+    return suggestions[0] if suggestions else None
 
 
 def pick_search_query(issue: str) -> str:
@@ -133,8 +145,8 @@ class MockProvider(LLMProvider):
     def _next_action(self, messages: list[Message]) -> dict[str, object]:
         issue = _extract_issue(messages)
         history = self._history(messages)
-        called = [tool for tool, _ in history]
-        suggestion = find_suggestion(issue)
+        called = [h.tool for h in history]
+        suggestions = find_suggestions(issue)
 
         if "list_files" not in called:
             return _act("Get an overview of the repository layout.", "list_files", {})
@@ -156,69 +168,102 @@ class MockProvider(LLMProvider):
         if "run_tests" not in called:
             return _act("Run the test suite to reproduce the failure.", "run_tests", {})
 
-        edited = "replace_in_file" in called
-        if suggestion and target and not edited:
-            old, new = suggestion
-            return _act(
-                f"Apply the minimal fix in {target}: replace {old!r} with {new!r}.",
-                "replace_in_file",
-                {"path": target, "old": old, "new": new},
-            )
+        edits = [h for h in history if h.tool == "replace_in_file"]
+        if edits and called[-1] == "replace_in_file":
+            return _act("Re-run the tests to verify the change.", "run_tests", {})
 
-        if edited and called[-1] != "run_tests":
-            return _act("Re-run the tests to verify the fix.", "run_tests", {})
-
-        last_test = next((obs for tool, obs in reversed(history) if tool == "run_tests"), "")
+        last_test = next((h.observation for h in reversed(history) if h.tool == "run_tests"), "")
         passed = "exit_code=0" in last_test
-        if edited and passed:
-            summary = (
-                f"Fixed the issue by changing `{suggestion[0] if suggestion else ''}` to "
-                f"`{suggestion[1] if suggestion else ''}` in `{target}`. The test suite now passes."
+
+        # Iterate on failure: keep applying the next suggested change while tests fail.
+        if len(edits) < len(suggestions) and not (edits and passed):
+            old, new = suggestions[len(edits)]
+            searched = next(
+                (h for h in history if h.tool == "search_code" and h.args.get("query") == old),
+                None,
             )
-        elif edited:
-            summary = f"Applied a candidate fix in `{target}`, but tests are still failing."
-        else:
-            summary = (
-                "Investigated the issue and reproduced it with the test suite, but no confident "
-                "patch could be derived offline. Configure a real LLM provider for open-ended "
-                "fixes."
-            )
+            if searched is None:
+                reason = "Tests are still failing; " if edits else ""
+                return _act(
+                    f"{reason}locate the next suspicious snippet {old!r}.",
+                    "search_code",
+                    {"query": old},
+                )
+            path = self._target_file([searched]) or target
+            if path:
+                prefix = "Tests still fail; try the next fix" if edits else "Apply the fix"
+                return _act(
+                    f"{prefix} in {path}: replace {old!r} with {new!r}.",
+                    "replace_in_file",
+                    {"path": path, "old": old, "new": new},
+                )
+
+        summary = _summary(edits, passed)
         return _act("Wrap up and report the outcome.", "finish", {"summary": summary})
 
     @staticmethod
-    def _history(messages: list[Message]) -> list[tuple[str, str]]:
+    def _history(messages: list[Message]) -> list[_Turn]:
         """Pair each assistant action with the observation that followed it."""
-        history: list[tuple[str, str]] = []
+        history: list[_Turn] = []
         for i, message in enumerate(messages):
             if message.role != "assistant":
                 continue
             try:
-                tool = str(json.loads(message.content).get("tool", ""))
+                payload = json.loads(message.content)
+                tool = str(payload.get("tool", ""))
+                args = payload.get("args") or {}
             except (json.JSONDecodeError, AttributeError):
                 continue
             observation = ""
             if i + 1 < len(messages) and messages[i + 1].role == "user":
                 observation = messages[i + 1].content
-            history.append((tool, observation))
+            history.append(_Turn(tool, args if isinstance(args, dict) else {}, observation))
         return history
 
     @staticmethod
-    def _target_file(history: list[tuple[str, str]]) -> str | None:
-        for tool, observation in history:
-            if tool == "search_code":
-                hits = [m.group(1) for m in _SEARCH_HIT_RE.finditer(observation)]
+    def _target_file(history: list[_Turn]) -> str | None:
+        for turn in history:
+            if turn.tool == "search_code":
+                hits = [m.group(1) for m in _SEARCH_HIT_RE.finditer(turn.observation)]
                 code = [h for h in hits if h.endswith(_CODE_EXTENSIONS)]
                 source = [h for h in code if "test" not in h.lower()]
                 for group in (source, code, hits):
                     if group:
                         return group[0]
-        for tool, observation in history:
-            if tool == "list_files":
-                for line in observation.splitlines():
+        for turn in history:
+            if turn.tool == "list_files":
+                for line in turn.observation.splitlines():
                     name = line.strip()
                     if name.endswith(_CODE_EXTENSIONS) and "test" not in name.lower():
                         return name
         return None
+
+
+@dataclass(frozen=True)
+class _Turn:
+    tool: str
+    args: dict[str, object]
+    observation: str
+
+
+def _summary(edits: list[_Turn], passed: bool) -> str:
+    changes = [
+        f"`{e.args.get('old', '')}` -> `{e.args.get('new', '')}` in `{e.args.get('path', '')}`"
+        for e in edits
+        if not e.observation.startswith(f"Observation from `{e.tool}` (error)")
+    ]
+    if edits and passed:
+        rounds = f" after {len(edits)} edit/test iterations" if len(edits) > 1 else ""
+        return f"Fixed the issue{rounds}: changed {'; '.join(changes)}. The test suite now passes."
+    if edits:
+        return (
+            f"Applied {len(edits)} candidate fix(es) ({'; '.join(changes) or 'none applied'}), "
+            "but tests are still failing."
+        )
+    return (
+        "Investigated the issue and reproduced it with the test suite, but no confident "
+        "patch could be derived offline. Configure a real LLM provider for open-ended fixes."
+    )
 
 
 def _act(thought: str, tool: str, args: dict[str, object]) -> dict[str, object]:
