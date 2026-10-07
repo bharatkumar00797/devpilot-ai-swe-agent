@@ -59,9 +59,12 @@ class Caller:
 
 def _client_ip(request: Request, trust_proxy: bool) -> str:
     if trust_proxy:
+        # A proxy appends the address it saw, so the right-most entry is the one added
+        # by the trusted edge; earlier entries are client-supplied and can be forged.
         forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            return forwarded.split(",")[0].strip()[:64]
+        hops = [hop.strip() for hop in forwarded.split(",") if hop.strip()]
+        if hops:
+            return hops[-1][:64]
     return request.client.host if request.client else "unknown"
 
 

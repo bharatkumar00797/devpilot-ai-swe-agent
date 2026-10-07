@@ -322,3 +322,13 @@ def test_serverless_entrypoint_exposes_public_demo_app(monkeypatch: pytest.Monke
         assert cfg["sync_runs"] is True
         assert cfg["providers"] == ["mock"]
         assert len(cfg["demos"]) >= 2
+
+
+def test_forwarded_ip_uses_the_hop_added_by_the_trusted_proxy() -> None:
+    with _client(api_keys=(), trust_proxy=True, rate_limit_per_minute=2) as client:
+        spoofed = [{"X-Forwarded-For": f"10.0.0.{i}, 203.0.113.7"} for i in range(3)]
+        codes = [client.get("/api/runs", headers=h).status_code for h in spoofed]
+        # rotating the forged left-most entry does not dodge the per-IP limit
+        assert codes == [200, 200, 429]
+        other = client.get("/api/runs", headers={"X-Forwarded-For": "198.51.100.9"})
+        assert other.status_code == 200
