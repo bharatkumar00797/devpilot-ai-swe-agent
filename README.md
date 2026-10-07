@@ -1,7 +1,7 @@
 # DevPilot — Autonomous AI Software Engineering Agent
 
 [![CI](https://github.com/bharatkumar00797/devpilot-ai-swe-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/bharatkumar00797/devpilot-ai-swe-agent/actions/workflows/ci.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Type checked: mypy strict](https://img.shields.io/badge/mypy-strict-informational.svg)](pyproject.toml)
 [![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
@@ -466,7 +466,7 @@ The suite covers the action parser, the agent loop (including invalid-reply reco
 limits), workspace path and symlink guards, the command runner (allowlist, metacharacters,
 timeouts, environment scrubbing), every tool, both demos end to end, and the API (auth modes,
 rate limits, ownership, validation, body cap, headers, sync vs async mode, proxy handling).
-CI runs it on Python 3.11 and 3.12, then builds the Docker image and smoke-tests it.
+CI runs it on Python 3.11, 3.12 and 3.13, then builds the Docker image and smoke-tests it.
 
 ## Roadmap
 

@@ -5,7 +5,7 @@ requests are all welcome.
 
 ## Development setup
 
-Requirements: Python 3.11 or 3.12, `git`. Docker is optional (only for the container checks).
+Requirements: Python 3.11 to 3.13, `git`. Docker is optional (only for the container checks).
 
 ```bash
 git clone https://github.com/bharatkumar00797/devpilot-ai-swe-agent.git
@@ -21,7 +21,7 @@ Never commit `.env` or any key.
 
 ## Checks
 
-Run these before opening a pull request; CI runs the same commands on Python 3.11 and 3.12.
+Run these before opening a pull request; CI runs the same commands on Python 3.11, 3.12 and 3.13.
 
 ```bash
 ruff check .            # lint
