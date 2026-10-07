@@ -5,6 +5,7 @@
 
 const $ = (id) => document.getElementById(id);
 const POLL_MS = 800;
+const ACTIVE = new Set(["queued", "running"]);
 const state = { config: null, runId: null, cursor: 0, timer: null };
 
 function el(tag, className, text) {
@@ -100,19 +101,28 @@ async function startRun(event) {
     max_steps: Number($("max-steps").value) || undefined,
   };
   const button = $("start");
+  const label = button.textContent;
   button.disabled = true;
+  if (state.config?.sync_runs) button.textContent = "Running…";
   try {
     const run = await api("/api/runs", { method: "POST", body: JSON.stringify(payload) });
-    selectRun(run.id);
+    if (ACTIVE.has(run.status)) {
+      selectRun(run.id);
+    } else {
+      // Sync (serverless) mode: the run already finished and the response carries
+      // the full trace, so render it without depending on follow-up requests.
+      showFinishedRun(run);
+    }
     refreshHistory();
   } catch (err) {
     showError(err.message);
   } finally {
     button.disabled = false;
+    button.textContent = label;
   }
 }
 
-function selectRun(id) {
+function resetRunView(id) {
   clearTimeout(state.timer);
   window.history.replaceState(null, "", `#run=${encodeURIComponent(id)}`);
   state.runId = id;
@@ -121,7 +131,18 @@ function selectRun(id) {
   $("diff").replaceChildren(el("span", "muted", "No diff yet."));
   $("summary").replaceChildren(el("span", "muted", "The PR description appears when the run finishes."));
   $("run-facts").classList.remove("hidden");
+}
+
+function selectRun(id) {
+  resetRunView(id);
   poll();
+}
+
+function showFinishedRun(run) {
+  resetRunView(run.id);
+  (run.steps || []).forEach(appendStep);
+  state.cursor = (run.steps || []).length;
+  renderRun(run);
 }
 
 async function poll() {
@@ -177,7 +198,10 @@ function appendStep(step) {
 }
 
 async function renderDetail(id) {
-  const run = await api(`/api/runs/${id}`);
+  renderRun(await api(`/api/runs/${id}`));
+}
+
+function renderRun(run) {
   $("run-title").textContent = run.title || "Run";
   setStatus(run.status);
   const tests = $("fact-tests");
