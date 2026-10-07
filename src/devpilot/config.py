@@ -6,14 +6,14 @@ import os
 from dataclasses import dataclass
 
 
-def _env_bool(name: str, default: bool) -> bool:
+def env_bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _env_int(name: str, default: int) -> int:
+def env_int(name: str, default: int) -> int:
     raw = os.getenv(name)
     if raw is None or not raw.strip():
         return default
@@ -40,7 +40,7 @@ class Settings:
             base_url=os.getenv("DEVPILOT_BASE_URL", cls.base_url),
             api_key=os.getenv("DEVPILOT_API_KEY", ""),
             model=os.getenv("DEVPILOT_MODEL", cls.model),
-            max_steps=_env_int("DEVPILOT_MAX_STEPS", cls.max_steps),
-            command_timeout=_env_int("DEVPILOT_COMMAND_TIMEOUT", cls.command_timeout),
-            isolate_network=_env_bool("DEVPILOT_ISOLATE_NETWORK", cls.isolate_network),
+            max_steps=env_int("DEVPILOT_MAX_STEPS", cls.max_steps),
+            command_timeout=env_int("DEVPILOT_COMMAND_TIMEOUT", cls.command_timeout),
+            isolate_network=env_bool("DEVPILOT_ISOLATE_NETWORK", cls.isolate_network),
         )
