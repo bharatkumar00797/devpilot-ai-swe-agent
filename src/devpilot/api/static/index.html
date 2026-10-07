@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DevPilot · AI Software Engineering Agent</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">DP</span>
+      <div>
+        <h1>DevPilot</h1>
+        <p class="tagline">Autonomous AI software engineer — issue in, tested patch out</p>
+      </div>
+    </div>
+    <div class="meta">
+      <span id="mode" class="pill">connecting…</span>
+      <span id="version" class="muted"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card form-card">
+      <h2>New run</h2>
+      <form id="run-form" autocomplete="off">
+        <label for="repo-select">Repository</label>
+        <select id="repo-select"></select>
+        <input id="repo-path" class="hidden" type="text" placeholder="/absolute/path/inside/allowlist">
+
+        <label for="issue">Issue</label>
+        <textarea id="issue" rows="9" required placeholder="Describe the bug or change…"></textarea>
+        <div class="hint"><span id="issue-count">0</span> / <span id="issue-max">8000</span> characters</div>
+
+        <div class="row">
+          <div>
+            <label for="provider">Provider</label>
+            <select id="provider"></select>
+          </div>
+          <div>
+            <label for="max-steps">Max steps</label>
+            <input id="max-steps" type="number" min="1" value="15">
+          </div>
+        </div>
+
+        <div id="key-field" class="hidden">
+          <label for="api-key">API key</label>
+          <input id="api-key" type="password" placeholder="X-API-Key (kept in this tab only)">
+        </div>
+
+        <button id="start" type="submit" class="primary">Start run</button>
+        <p id="form-error" class="error hidden" role="alert"></p>
+      </form>
+
+      <h2 class="spaced">Recent runs</h2>
+      <ul id="history" class="history"><li class="muted">No runs yet.</li></ul>
+    </section>
+
+    <section class="card result-card">
+      <div class="result-head">
+        <h2 id="run-title">No run selected</h2>
+        <span id="run-status" class="badge hidden"></span>
+      </div>
+      <div id="run-facts" class="facts hidden">
+        <div><span class="label">Tests</span><span id="fact-tests">–</span></div>
+        <div><span class="label">Steps</span><span id="fact-steps">0</span></div>
+        <div><span class="label">Files changed</span><span id="fact-files">–</span></div>
+        <div><span class="label">Model</span><span id="fact-model">–</span></div>
+      </div>
+
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="trace" role="tab">Trace</button>
+        <button class="tab" data-tab="diff" role="tab">Diff</button>
+        <button class="tab" data-tab="summary" role="tab">PR summary</button>
+      </nav>
+
+      <div id="tab-trace" class="tab-panel">
+        <ol id="trace" class="trace"><li class="muted">Start a run to watch the agent work.</li></ol>
+      </div>
+      <div id="tab-diff" class="tab-panel hidden">
+        <pre id="diff" class="diff"><span class="muted">No diff yet.</span></pre>
+      </div>
+      <div id="tab-summary" class="tab-panel hidden">
+        <pre id="summary" class="summary"><span class="muted">The PR description appears when the run finishes.</span></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer muted">
+    Runs execute in a throwaway sandbox copy · your checkout is never modified ·
+    <a href="/docs">API docs</a>
+  </footer>
+</body>
+</html>
