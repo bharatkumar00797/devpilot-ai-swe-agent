@@ -1,0 +1,21 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Deploys the Docker image as a public demo (bundled demos + offline mock provider).
+# To enable your own repos or a real LLM, add DEVPILOT_API_KEYS (and DEVPILOT_PROVIDER,
+# DEVPILOT_API_KEY, ...) as secret environment variables in the Render dashboard.
+services:
+  - type: web
+    name: devpilot-ai
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: DEVPILOT_PROVIDER
+        value: mock
+      # Render's proxy appends the real client IP to X-Forwarded-For
+      - key: DEVPILOT_TRUST_PROXY
+        value: "true"
+      - key: DEVPILOT_MAX_CONCURRENT_RUNS
+        value: "1"
