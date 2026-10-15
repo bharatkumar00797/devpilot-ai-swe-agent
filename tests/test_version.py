@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
+from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 import devpilot
@@ -25,3 +27,20 @@ def test_version_is_reported_by_api_and_cli() -> None:
         assert client.get("/openapi.json").json()["info"]["version"] == devpilot.__version__
     version_action = next(a for a in build_parser()._actions if a.dest == "version")
     assert version_action.version == f"devpilot {devpilot.__version__}"
+
+
+def test_serve_defaults_to_port_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    import uvicorn
+
+    from devpilot.cli import main
+
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: seen.update(kw))
+    monkeypatch.setenv("PORT", "9123")
+    assert main(["serve"]) == 0
+    assert seen["port"] == 9123
+    assert main(["serve", "--port", "8001"]) == 0
+    assert seen["port"] == 8001
+    monkeypatch.delenv("PORT")
+    assert main(["serve"]) == 0
+    assert seen["port"] == 8000

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -71,8 +72,9 @@ def _cmd_serve(ns: argparse.Namespace) -> int:
         if settings.auth_enabled
         else ("dev mode (no auth)" if settings.dev_mode else "public demo (mock + demos only)")
     )
-    print(f"DevPilot {__version__} API on http://{ns.host}:{ns.port} | {mode}")
-    uvicorn.run(create_app(settings), host=ns.host, port=ns.port, log_level="info")
+    port = ns.port or int(os.getenv("PORT") or 8000)
+    print(f"DevPilot {__version__} API on http://{ns.host}:{port} | {mode}")
+    uvicorn.run(create_app(settings), host=ns.host, port=port, log_level="info")
     return 0
 
 
@@ -95,7 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     serve = sub.add_parser("serve", help="start the REST API and web dashboard")
     serve.add_argument("--host", default="127.0.0.1", help="bind address (default: 127.0.0.1)")
-    serve.add_argument("--port", type=int, default=8000, help="port (default: 8000)")
+    serve.add_argument("--port", type=int, default=None, help="port (default: $PORT or 8000)")
     serve.add_argument("--dev", action="store_true", help="dev mode: no API key required")
     serve.set_defaults(func=_cmd_serve)
     return parser
